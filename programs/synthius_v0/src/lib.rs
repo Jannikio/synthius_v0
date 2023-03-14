@@ -2,9 +2,9 @@ use std::mem::size_of;
 use anchor_lang::prelude::*;
 use solana_program::account_info::AccountInfo;
 use anchor_spl::{token, associated_token};
-use clockwork_sdk::state::{Thread, ThreadAccount};
+use clockwork_sdk::state::{Thread};
 use anchor_lang::solana_program::{
-    instruction::Instruction, native_token::LAMPORTS_PER_SOL, system_program};
+    instruction::Instruction, native_token::LAMPORTS_PER_SOL};
 use anchor_lang::InstructionData;
 
 pub mod pyth;
@@ -374,7 +374,7 @@ pub struct BuyLong<'info> {
         payer = payer,
         token::mint = collateral_token_mint,
         token::authority = vault,
-        seeds = [b"vaultWallet6".as_ref(), payer.key.as_ref()],bump
+        seeds = [b"vault_wallet".as_ref(), payer.key.as_ref()],bump
     )]
     pub vault_wallet: Account<'info, token::TokenAccount>,
 }
@@ -403,7 +403,7 @@ pub struct SellLong<'info> {
     #[account(mut,
         token::mint = collateral_token_mint,
         token::authority = vault,
-        seeds = [b"vaultWallet6".as_ref(), payer.key.as_ref()],bump
+        seeds = [b"vault_wallet".as_ref(), payer.key.as_ref()],bump
     )]
     pub vault_wallet: Account<'info, token::TokenAccount>,
     #[account(signer, constraint = thread.authority.eq(&thread_authority.key()))]
@@ -437,7 +437,7 @@ pub struct BuyShort<'info> {
         payer = payer,
         token::mint = collateral_token_mint,
         token::authority = vault,
-        seeds = [b"vaultWallet6".as_ref(), payer.key.as_ref()],bump
+        seeds = [b"vault_wallet".as_ref(), payer.key.as_ref()],bump
     )]
     pub vault_wallet: Account<'info, token::TokenAccount>,
 }
@@ -466,7 +466,7 @@ pub struct SellShort<'info> {
     #[account(mut,
         token::mint = collateral_token_mint,
         token::authority = vault,
-        seeds = [b"vaultWallet6".as_ref(), payer.key.as_ref()],bump
+        seeds = [b"vault_wallet".as_ref(), payer.key.as_ref()],bump
     )]
     pub vault_wallet: Account<'info, token::TokenAccount>,
     #[account(signer,
@@ -492,7 +492,7 @@ pub struct AddLiquidity<'info> {
     #[account(mut,
         token::mint = collateral_token_mint,
         token::authority = vault,
-        seeds = [b"vaultWallet6".as_ref(), payer.key.as_ref()],bump
+        seeds = [b"vault_wallet".as_ref(), payer.key.as_ref()],bump
     )]
     pub vault_wallet: Account<'info, token::TokenAccount>
 }
@@ -515,7 +515,7 @@ pub struct Trigger<'info> {
     #[account(mut,
         token::mint = collateral_token_mint,
         token::authority = vault,
-        seeds = [b"vaultWallet6".as_ref(), payer.key.as_ref()],bump
+        seeds = [b"vault_wallet".as_ref(), payer.key.as_ref()],bump
     )]
     pub vault_wallet: Account<'info, token::TokenAccount>,
     #[account(mut)]

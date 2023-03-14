@@ -30,7 +30,7 @@ describe("synthius_v0", () => {
     [Buffer.from(anchor.utils.bytes.utf8.encode("vault")), payer.publicKey.toBuffer()], programId
   );
   const vaultWalletKey = PublicKey.findProgramAddressSync(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("vaultWallet6")), payer.publicKey.toBuffer()], programId
+    [Buffer.from(anchor.utils.bytes.utf8.encode("vault_wallet")), payer.publicKey.toBuffer()], programId
   ) [0];
 
   const threadId = "counter-" + new Date().getTime() / 1000;
@@ -44,7 +44,7 @@ describe("synthius_v0", () => {
   var programKey;
   try {
       let data = fs.readFileSync(
-          '/Users/jannikspilker/Desktop/Grizzlython/synthius_v0/target/deploy/synthius_v0-keypair.json',
+          'synthius_v0-keypair.json',
       );
       programKey = anchor.web3.Keypair.fromSecretKey(
           new Uint8Array(JSON.parse(data))
