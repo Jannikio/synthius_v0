@@ -5,11 +5,14 @@ import fs from "fs";
 import assert from "assert";
 import { PublicKey } from "@solana/web3.js";
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
+import { ClockworkProvider } from "@clockwork-xyz/sdk";
 
 describe("synthius_v0", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
+  const payer = provider.wallet as anchor.Wallet;
+  const clockworkProvider = new ClockworkProvider(payer, provider.connection);
 
   const program = anchor.workspace.SynthiusV0 as Program<SynthiusV0>;
   const programId = program.programId;
@@ -23,13 +26,20 @@ describe("synthius_v0", () => {
   const dummyTokenAmount = new anchor.BN(5);
 
   const config = anchor.web3.Keypair.generate();
-  const payer = provider.wallet as anchor.Wallet;
   const [vaultKey, vaultBump] = PublicKey.findProgramAddressSync(
     [Buffer.from(anchor.utils.bytes.utf8.encode("vault")), payer.publicKey.toBuffer()], programId
   );
   const vaultWalletKey = PublicKey.findProgramAddressSync(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("vaultWallet5")), payer.publicKey.toBuffer()], programId
+    [Buffer.from(anchor.utils.bytes.utf8.encode("vaultWallet6")), payer.publicKey.toBuffer()], programId
   ) [0];
+
+  const threadId = "counter-" + new Date().getTime() / 1000;
+  const [threadAuthority] = PublicKey.findProgramAddressSync(
+    [anchor.utils.bytes.utf8.encode("authority"), payer.publicKey.toBuffer()], 
+    program.programId
+  );
+  const [threadAddress, threadBump] = clockworkProvider.getThreadPDA(threadAuthority, threadId)
+
 
   var programKey;
   try {
@@ -125,7 +135,9 @@ describe("synthius_v0", () => {
                 collateralTokenMint: collateralMintKeypair.publicKey,
                 collateralTokenAccount: associatedTokenAddressCollateral,
                 vaultWallet: vaultWalletKey,
-                vault: vaultKey
+                vault: vaultKey,
+                thread: threadAddress,
+                threadAuthority: threadAuthority,
               }).signers([payer.payer]).rpc();
     console.log("Your transaction signature", tx);
   });
@@ -175,6 +187,8 @@ describe("synthius_v0", () => {
               collateralTokenMint: collateralMintKeypair.publicKey,
               collateralTokenAccount: associatedTokenAddressCollateral,
               vaultWallet: vaultWalletKey,
+              thread: threadAddress,
+              threadAuthority: threadAuthority,
             }).signers([payer.payer]).rpc();
     console.log("Your transaction signature", tx);
   });
@@ -196,5 +210,36 @@ describe("synthius_v0", () => {
               }).signers([payer.payer]).rpc();
     console.log("Your transaction signature", tx);
   })
+
+  it ("Liquidates every 24 hours", async () => {
+    const associatedTokenAddressCollateral =
+          await anchor.utils.token.associatedAddress({mint: collateralMintKeypair.publicKey, owner: payer.publicKey});
+    const associatedTokenAddressShortToken = 
+          await anchor.utils.token.associatedAddress({mint: shortMintKeypair.publicKey, owner: payer.publicKey});
+    const associatedTokenAddressLongToken = 
+          await anchor.utils.token.associatedAddress({mint: longMintKeypair.publicKey, owner: payer.publicKey});
+    let tx = await program.methods.trigger(Buffer.from(threadId),vaultBump, payer.publicKey)
+            .accounts({
+              config: config.publicKey,
+              pythLoanAccount: new anchor.web3.PublicKey(example_price),
+              payer: payer.publicKey,
+              systemProgram: anchor.web3.SystemProgram.programId,
+              tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+              associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+              vault: vaultKey,
+              shortTokenMint: shortMintKeypair.publicKey,
+              mintAuthority: payer.publicKey,
+              shortTokenAccount: associatedTokenAddressShortToken,
+              longTokenMint: longMintKeypair.publicKey,
+              longTokenAccount: associatedTokenAddressLongToken,
+              collateralTokenMint: collateralMintKeypair.publicKey,
+              collateralTokenAccount: associatedTokenAddressCollateral,
+              vaultWallet: vaultWalletKey,
+              thread: threadAddress,
+              threadAuthority: threadAuthority,
+              clockworkProgram: clockworkProvider.threadProgram.programId,
+            }).signers([payer.payer]).rpc();
+    console.log("Your transaction signature", tx);
+  });
 
 });
