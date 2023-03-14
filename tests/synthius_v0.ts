@@ -28,13 +28,13 @@ describe("synthius_v0", () => {
     [Buffer.from(anchor.utils.bytes.utf8.encode("vault")), payer.publicKey.toBuffer()], programId
   );
   const vaultWalletKey = PublicKey.findProgramAddressSync(
-    [Buffer.from(anchor.utils.bytes.utf8.encode("vaultWallet")), payer.publicKey.toBuffer()], programId
+    [Buffer.from(anchor.utils.bytes.utf8.encode("vaultWallet5")), payer.publicKey.toBuffer()], programId
   ) [0];
 
   var programKey;
   try {
       let data = fs.readFileSync(
-          '/Users/jannikspilker/Desktop/Grizzlython/v0/target/deploy/v0-keypair.json',
+          '/Users/jannikspilker/Desktop/Grizzlython/synthius_v0/target/deploy/synthius_v0-keypair.json',
       );
       programKey = anchor.web3.Keypair.fromSecretKey(
           new Uint8Array(JSON.parse(data))
@@ -194,6 +194,7 @@ describe("synthius_v0", () => {
                 vault: vaultKey,
                 vaultWallet: vaultWalletKey
               }).signers([payer.payer]).rpc();
+    console.log("Your transaction signature", tx);
   })
 
 });
