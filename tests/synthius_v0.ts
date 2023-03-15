@@ -33,7 +33,7 @@ describe("synthius_v0", () => {
     [Buffer.from(anchor.utils.bytes.utf8.encode("vault_wallet")), payer.publicKey.toBuffer()], programId
   ) [0];
 
-  const threadId = "counter-" + new Date().getTime() / 1000;
+  const threadId = "liquidator-" + new Date().getTime() / 1000;
   const [threadAuthority] = PublicKey.findProgramAddressSync(
     [anchor.utils.bytes.utf8.encode("authority"), payer.publicKey.toBuffer()], 
     program.programId
@@ -136,8 +136,6 @@ describe("synthius_v0", () => {
                 collateralTokenAccount: associatedTokenAddressCollateral,
                 vaultWallet: vaultWalletKey,
                 vault: vaultKey,
-                thread: threadAddress,
-                threadAuthority: threadAuthority,
               }).signers([payer.payer]).rpc();
     console.log("Your transaction signature", tx);
   });
@@ -187,8 +185,6 @@ describe("synthius_v0", () => {
               collateralTokenMint: collateralMintKeypair.publicKey,
               collateralTokenAccount: associatedTokenAddressCollateral,
               vaultWallet: vaultWalletKey,
-              thread: threadAddress,
-              threadAuthority: threadAuthority,
             }).signers([payer.payer]).rpc();
     console.log("Your transaction signature", tx);
   });

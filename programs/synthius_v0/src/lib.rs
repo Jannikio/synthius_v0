@@ -118,6 +118,53 @@ pub mod synthius_v0 {
 
     }
 
+    pub fn liquidata_long(ctx: Context<LiquidateLong>, bump: u8, signer: Pubkey) -> Result<()> {
+        let signer_pubkey = signer.key();
+        let signer = signer_pubkey.as_ref();
+        let seeds =  &[&[b"vault", signer , anchor_lang::__private::bytemuck::bytes_of(&bump)][..]];
+        let collateral = ctx.accounts.vault.amount;
+        let price_entered = ctx.accounts.vault.price_entered;
+        let price_feed = &ctx.accounts.pyth_loan_account;
+        let current_timestamp = Clock::get()?.unix_timestamp;
+        let stock_price = price_feed
+            .get_price_no_older_than(current_timestamp, 60)
+            .ok_or(error!(ErrorCode::PythOffline))?;
+        let remaining_collateral: i64;
+        if ctx.accounts.vault.position != Position::Long {
+            return Err(error!(ErrorCode::InvalidArgument));
+        }
+        token::burn(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Burn {
+                    mint: ctx.accounts.long_token_mint.to_account_info(),
+                    from: ctx.accounts.long_token_account.to_account_info(),
+                    authority: ctx.accounts.mint_authority.to_account_info(),
+                }
+            ),1)?;
+        if stock_price.price > price_entered {
+            let profit = stock_price.price - price_entered;
+            remaining_collateral = (collateral as i64) + profit;
+            msg!("You made a profit of {}!", remaining_collateral);
+        } else {
+            let loss = price_entered - stock_price.price;
+            remaining_collateral = (collateral as i64) - loss;
+            msg!("You made a loss of {}!", remaining_collateral);
+        }
+
+        let cpi_context = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.vault_wallet.to_account_info(),
+                to: ctx.accounts.collateral_token_account.to_account_info(),
+                authority: ctx.accounts.vault.to_account_info(),
+            },
+            seeds,
+        );
+        token::transfer(cpi_context, 1/*remaining_collateral as u64*/)?;
+        Ok(())
+    }
+
     pub fn buy_short(ctx: Context<BuyShort>, amount: u64) -> Result<()> {
         ctx.accounts.vault.amount += amount;
         ctx.accounts.vault.position = Position::Short;
@@ -195,6 +242,52 @@ pub mod synthius_v0 {
         Ok(())
     }
 
+    pub fn liquidata_short(ctx: Context<LiquidateShort>, bump:u8, signer: Pubkey) -> Result<()> {
+        let signer_pubkey = signer.key();
+        let signer = signer_pubkey.as_ref();
+        let seeds =  &[&[b"vault", signer , anchor_lang::__private::bytemuck::bytes_of(&bump)][..]];
+        let collateral = ctx.accounts.vault.amount;
+        let price_entered = ctx.accounts.vault.price_entered;
+        let price_feed = &ctx.accounts.pyth_loan_account;
+        let current_timestamp = Clock::get()?.unix_timestamp;
+        let stock_price = price_feed
+            .get_price_no_older_than(current_timestamp, 60)
+            .ok_or(error!(ErrorCode::PythOffline))?;
+        let remaining_collateral: i64;
+        if ctx.accounts.vault.position != Position::Short {
+            return Err(error!(ErrorCode::InvalidArgument));
+        }
+        token::burn(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Burn {
+                    mint: ctx.accounts.short_token_mint.to_account_info(),
+                    from: ctx.accounts.short_token_account.to_account_info(),
+                    authority: ctx.accounts.mint_authority.to_account_info(),
+                }
+            ),1)?;
+        if stock_price.price < price_entered {
+            let profit = price_entered - stock_price.price;
+            remaining_collateral = (collateral as i64) + profit;
+            msg!("You made a profit of {}!", remaining_collateral);
+        } else {
+            let loss = stock_price.price - price_entered;
+            remaining_collateral = (collateral as i64) - loss;
+            msg!("You made a loss of {}!", remaining_collateral);
+        }
+        let cpi_context = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.vault_wallet.to_account_info(),
+                to: ctx.accounts.collateral_token_account.to_account_info(),
+                authority: ctx.accounts.vault.to_account_info(),
+            },
+            seeds,
+        );
+        token::transfer(cpi_context, 1/*remaining_collateral as u64*/)?;
+        Ok(())
+    } 
+
     pub fn add_liquidity(ctx: Context<AddLiquidity>, amount: u64) -> Result<()> {
         let cpi_context = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -230,7 +323,7 @@ pub mod synthius_v0 {
         if vault.position == Position::Long{
             let target_ix = Instruction {
                 program_id: ID,
-                accounts: crate::accounts::SellLong {
+                accounts: crate::accounts::LiquidateLong {
                     config: config.key(),
                     pyth_loan_account: pyth_loan_account.key(),
                     system_program: system_program.key(),
@@ -250,7 +343,7 @@ pub mod synthius_v0 {
                 data: crate::instruction::SellLong {bump, signer}.data(),
             };
             let trigger = clockwork_sdk::state::Trigger::Cron {
-                schedule: "0 * * * * *".into(),
+                schedule: "*/10 * * * * * *".into(),
                 skippable: true,
             };
             let bump = *ctx.bumps.get("thread_authority").unwrap();
@@ -270,10 +363,10 @@ pub mod synthius_v0 {
                 vec![target_ix.into()],
                 trigger,
             )?;
-        } else if vault.position == Position::Short{
+        } else {
             let target_ix = Instruction {
                 program_id: ID,
-                accounts: crate::accounts::SellShort {
+                accounts: crate::accounts::LiquidateShort {
                     config: config.key(),
                     pyth_loan_account: pyth_loan_account.key(),
                     system_program: system_program.key(),
@@ -293,7 +386,7 @@ pub mod synthius_v0 {
                 data: crate::instruction::SellShort {bump, signer}.data(),
             };
             let trigger = clockwork_sdk::state::Trigger::Cron {
-                schedule: "0 * * * * *".into(),
+                schedule: "*/10 * * * * * *".into(),
                 skippable: true,
             };
             let bump = *ctx.bumps.get("thread_authority").unwrap();
@@ -406,6 +499,35 @@ pub struct SellLong<'info> {
         seeds = [b"vault_wallet".as_ref(), payer.key.as_ref()],bump
     )]
     pub vault_wallet: Account<'info, token::TokenAccount>,
+}
+
+#[derive(Accounts)]
+pub struct LiquidateLong<'info> {
+    pub config: Account<'info, AdminConfig>,
+    #[account(address = config.loan_price_feed_id @ ErrorCode::InvalidArgument)]
+    pub pyth_loan_account: Account<'info, PriceFeed>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, token::Token>,
+    pub associated_token_program: Program<'info, associated_token::AssociatedToken>,
+    #[account(mut, seeds = [b"vault".as_ref(), payer.key.as_ref()], bump)]
+    pub vault: Account<'info, Vault>,
+    #[account(mut)]
+    pub long_token_mint: Account<'info, token::Mint>,
+    pub mint_authority: SystemAccount<'info>,
+    #[account(mut, associated_token::mint = long_token_mint, associated_token::authority = payer)]
+    pub long_token_account: Account<'info, token::TokenAccount>,
+    #[account(mut)]
+    pub collateral_token_mint: Account<'info, token::Mint>,
+    #[account(mut, associated_token::mint = collateral_token_mint, associated_token::authority = payer)]
+    pub collateral_token_account: Account<'info, token::TokenAccount>,
+    #[account(mut,
+        token::mint = collateral_token_mint,
+        token::authority = vault,
+        seeds = [b"vault_wallet".as_ref(), payer.key.as_ref()],bump
+    )]
+    pub vault_wallet: Account<'info, token::TokenAccount>,
     #[account(signer, constraint = thread.authority.eq(&thread_authority.key()))]
     pub thread: Account<'info, Thread>,
     #[account(seeds = [b"authority".as_ref(), payer.key.as_ref()], bump)]
@@ -444,6 +566,35 @@ pub struct BuyShort<'info> {
 
 #[derive(Accounts)]
 pub struct SellShort<'info> {
+    pub config: Account<'info, AdminConfig>,
+    #[account(address = config.loan_price_feed_id @ ErrorCode::InvalidArgument)]
+    pub pyth_loan_account: Account<'info, PriceFeed>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, token::Token>,
+    pub associated_token_program: Program<'info, associated_token::AssociatedToken>,
+    #[account(mut, seeds = [b"vault".as_ref(), payer.key.as_ref()], bump)]
+    pub vault: Account<'info, Vault>,
+    #[account(mut)]
+    pub short_token_mint: Account<'info, token::Mint>,
+    pub mint_authority: SystemAccount<'info>,
+    #[account(mut, associated_token::mint = short_token_mint, associated_token::authority = payer)]
+    pub short_token_account: Account<'info, token::TokenAccount>,
+    #[account(mut)]
+    pub collateral_token_mint: Account<'info, token::Mint>,
+    #[account(mut, associated_token::mint = collateral_token_mint, associated_token::authority = payer)]
+    pub collateral_token_account: Account<'info, token::TokenAccount>,
+    #[account(mut,
+        token::mint = collateral_token_mint,
+        token::authority = vault,
+        seeds = [b"vault_wallet".as_ref(), payer.key.as_ref()],bump
+    )]
+    pub vault_wallet: Account<'info, token::TokenAccount>,
+}
+
+#[derive(Accounts)]
+pub struct LiquidateShort<'info> {
     pub config: Account<'info, AdminConfig>,
     #[account(address = config.loan_price_feed_id @ ErrorCode::InvalidArgument)]
     pub pyth_loan_account: Account<'info, PriceFeed>,
