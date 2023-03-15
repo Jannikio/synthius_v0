@@ -50,13 +50,13 @@ describe("synthius_v0", () => {
           new Uint8Array(JSON.parse(data))
       );
   } catch (error) {
-      throw new Error("Please make sure the program key is program_address.json.");
+      throw new Error("Please make sure the program key is synthius_v0-keypair.json.");
   }
 
   try {
       assert(programId.equals(programKey.publicKey));
   } catch (error) {
-      throw new Error("Please make sure you have the same program address in Anchor.toml and program_address.json");
+      throw new Error("Please make sure you have the same program address in Anchor.toml and synthius_v0-keypair.json.");
   }
 
 
