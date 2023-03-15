@@ -343,7 +343,7 @@ pub mod synthius_v0 {
                 data: crate::instruction::SellLong {bump, signer}.data(),
             };
             let trigger = clockwork_sdk::state::Trigger::Cron {
-                schedule: "*/10 * * * * * *".into(),
+                schedule: "0 * * * * *".into(),
                 skippable: true,
             };
             let bump = *ctx.bumps.get("thread_authority").unwrap();
@@ -386,7 +386,7 @@ pub mod synthius_v0 {
                 data: crate::instruction::SellShort {bump, signer}.data(),
             };
             let trigger = clockwork_sdk::state::Trigger::Cron {
-                schedule: "*/10 * * * * * *".into(),
+                schedule: "0 * * * * *".into(),
                 skippable: true,
             };
             let bump = *ctx.bumps.get("thread_authority").unwrap();
